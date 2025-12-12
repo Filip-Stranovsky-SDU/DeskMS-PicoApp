@@ -1,6 +1,6 @@
 #pragma once
 
-#define TLS_SERVER_PORT 8765
+#define TLS_SERVER_PORT 8443
 
 typedef struct TLS_CLIENT_T_ {
     struct altcp_pcb *pcb;

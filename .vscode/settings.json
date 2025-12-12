@@ -39,6 +39,7 @@
     "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.12.1/ninja",
     "files.associations": {
         "tls_common.h": "c",
-        "dbop.h": "c"
+        "dbop.h": "c",
+        "http_common.h": "c"
     }
 }

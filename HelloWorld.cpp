@@ -10,9 +10,12 @@
 
 
 #include "tls_verify.h"
+#include "http_verify.h"
+
 
 extern "C" {
     #include "tls_common.h"
+    #include "http_common.h"
 }
 
 
@@ -79,11 +82,81 @@ int main()
     // sntp_setoperatingmode(SNTP_OPMODE_POLL);
     // sntp_setservername(0, "pool.ntp.org");
     // sntp_init();
+    //if(true){
+
+    //const char *server = HTTP_CLIENT_SERVER;
+
+    // char request[256];
+    // snprintf(request, sizeof(request),
+    //          "GET / HTTP/1.1\r\n"
+    //          "Host: %s\r\n"
+    //          "Connection: close\r\n"
+    //          "\r\n",
+    //          server);
+
+    // printf("HTTP request:\n%s\n", request);
+    /*
+    char request[512];
+    const char *json_body = "{ \"position_mm\": 1000 }";
+
+    snprintf(request, sizeof(request),
+            "GET /api/v2/E9Y2LxT4g1hQZ7aD8nR3mWx5P0qK6pV7/desks HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Content-Type: application/json\r\n"
+            "Connection: close\r\n"
+            "\r\n",
+            server);
+
+    printf("HTTP GET request:\n%s\n", request);
+
+
+
+    // --- TLS config (no cert verification) ---
+    const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
+
+    tls_config = altcp_tls_create_config_client(NULL, sizeof(cert_ok));
+    assert(tls_config);
+
+    http_CLIENT_T *state = http_client_init();
+    if (!state) {
+        printf("Failed to allocate state\n");
+        return 1;
+    }
+
+    state->http_request = request;
+    state->timeout = TLS_CLIENT_TIMEOUT_SECS;
+
+    // --- Start connection ---
+    if (!http_client_open(server, state)) {
+        printf("Failed to open connection\n");
+        return 1;
+    }
+
+    printf("Connecting...\n");
+
+    // --- Main loop (Wi-Fi already assumed active) ---
+    while (!state->complete) {
+        sleep_ms(10);
+    }
+
+    printf("Client finished.\n");
+
+    int err = state->error;
+
+    free(state);
+    altcp_tls_free_config(tls_config);
+
+    return err == 0 ? 0 : 1;
+    }
+
+    */
+
 
 
     // This should work
     const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
     const char tls_client_server[] = TLS_CLIENT_SERVER;
+    const char id[] = "cd:fb:1a:53:fb:e6";
     char key[26];
     generate_ws_key(key);
     char request[512];
@@ -96,14 +169,17 @@ int main()
         "Connection: Upgrade\r\n"
         "Sec-WebSocket-Key: %s\r\n"
         "Sec-WebSocket-Version: 13\r\n"
+        "X-Client-ID: %s\r\n"    // <- custom header with your ID
         "\r\n",
-        tls_client_server, key);
+        tls_client_server, key, id);
     
     printf("XD\n");
     printf(request);
 
     tls_config = altcp_tls_create_config_client(nullptr, sizeof(cert_ok));
     assert(tls_config);
+    
+    
 
     TLS_CLIENT_T *state = tls_client_init();
     if (!state) {

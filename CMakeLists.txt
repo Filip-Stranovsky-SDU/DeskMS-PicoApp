@@ -34,14 +34,16 @@ set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
-
 # Add executable. Default name is the project name, version 0.1
 
 file(GLOB BUTTONLED "${CMAKE_SOURCE_DIR}/ButtonLED/*.cpp")
+add_subdirectory(wsparsing)
+
 
 
 add_executable(HelloWorld HelloWorld.cpp
                 tls_client/tls_common.c
+                http_client/http_common.c
                 ${BUTTONLED}
 )
 message(STATUS "Executable was added")
@@ -59,6 +61,8 @@ pico_enable_stdio_usb(HelloWorld 1)
 target_include_directories(HelloWorld PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_SOURCE_DIR}/tls_client
+        
+        ${CMAKE_SOURCE_DIR}/http_client
         ${CMAKE_SOURCE_DIR}/ButtonLED
         ${CMAKE_SOURCE_DIR}/..
 
@@ -79,6 +83,7 @@ target_link_libraries(HelloWorld
         pico_mbedtls
         pico_stdlib
         hardware_rtc
+        wsparsing
         
         )
 
