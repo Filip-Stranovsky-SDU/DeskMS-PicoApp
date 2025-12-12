@@ -27,6 +27,8 @@ namespace sxd{
 
 class Dispatcher {
 public:
+    Dispatcher();
+
     int dispatch_ws_message(std::string_view message);
 
 

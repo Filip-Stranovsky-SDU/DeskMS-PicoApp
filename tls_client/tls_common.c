@@ -20,22 +20,48 @@
 
 struct altcp_tls_config *tls_config = NULL;  // actual definition + initialization
 
-
 void ws_send_text(struct altcp_pcb *pcb, const char *msg)
 {
-    uint8_t frame[128];
     size_t len = strlen(msg);
 
-    frame[0] = 0x81; // FIN + text frame
-    frame[1] = 0x80 | len; // MASK bit + payload length
+    // Limit for stack buffer (adjust as needed)
+    if (len > 65535) {
+        // too long for this simple implementation
+        return;
+    }
 
-    uint8_t key[4] = {1,2,3,4}; // any random mask
-    memcpy(&frame[2], key, 4);
+    // Calculate header size
+    size_t header_len = 2; // basic header
+    if (len >= 126 && len <= 65535) header_len += 2; // 16-bit extended length
+    // Note: not handling 64-bit length here for simplicity
 
-    for (size_t i = 0; i < len; i++)
-        frame[6 + i] = msg[i] ^ key[i % 4];
+    size_t total_len = header_len + 4 + len; // 4 bytes for mask
+    uint8_t frame[total_len]; // stack buffer
 
-    altcp_write(pcb, frame, 6 + len, TCP_WRITE_FLAG_COPY);
+    size_t offset = 0;
+    frame[offset++] = 0x81; // FIN + text frame
+
+    // Mask bit = 1
+    if (len <= 125) {
+        frame[offset++] = 0x80 | (uint8_t)len;
+    } else if (len <= 65535) {
+        frame[offset++] = 0x80 | 126;
+        frame[offset++] = (len >> 8) & 0xFF;
+        frame[offset++] = len & 0xFF;
+    }
+
+    // Random mask key (example, can be random)
+    uint8_t mask[4] = {1,2,3,4};
+    memcpy(&frame[offset], mask, 4);
+    offset += 4;
+
+    // Apply mask to payload
+    for (size_t i = 0; i < len; i++) {
+        frame[offset + i] = msg[i] ^ mask[i % 4];
+    }
+
+    // Write frame
+    altcp_write(pcb, frame, offset + len, TCP_WRITE_FLAG_COPY);
     altcp_output(pcb);
 }
 
@@ -128,31 +154,55 @@ err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t er
     }
 
     if (p->tot_len > 0) {
-        /* For simplicity this examples creates a buffer on stack the size of the data pending here, 
-           and copies all the data to it in one go.
-           Do be aware that the amount of data can potentially be a bit large (TLS record size can be 16 KB),
-           so you may want to use a smaller fixed size buffer and copy the data to it using a loop, if memory is a concern */
-        char buf[p->tot_len + 1];
-
-        pbuf_copy_partial(p, buf, p->tot_len, 0);
-        buf[p->tot_len] = 0;
-
-        // Minimal WebSocket text frame parse
-        uint8_t opcode = buf[0] & 0x0F;
-        uint8_t len = buf[1] & 0x7F;
-
-        if (opcode == 0x1) { // text
-            printf("WS text: %.*s\n", len, &buf[2]);
-        } else {
-            printf("Non-text frame opcode=%d len=%d\n", opcode, len);
+        // Cap stack buffer to something reasonable, e.g., 4 KB
+        if (p->tot_len > 4096) {
+            printf("Payload too large for stack\n");
+            pbuf_free(p);
+            return ERR_MEM;
         }
 
+        char buf[p->tot_len + 1];
+        pbuf_copy_partial(p, buf, p->tot_len, 0);
+        buf[p->tot_len+1] = 0;
+
+        // Minimal WebSocket parse
+        size_t header_len = 2;
+        uint8_t opcode = buf[0] & 0x0F;
+        uint64_t payload_len = buf[1] & 0x7F;
+
+        // Extended payload length (16-bit)
+        if (payload_len == 126) {
+            payload_len = (buf[2] << 8) | buf[3];
+            header_len += 2;
+        }
+
+        // Mask (client-to-server)
+        uint8_t mask[4] = {0};
+        if (buf[1] & 0x80) {
+            for (int i = 0; i < 4; i++) mask[i] = buf[header_len + i];
+            header_len += 4;
+        }
+
+        // Payload start
+        buf[p->tot_len] = '\0';
+        uint8_t *payload = (uint8_t*)&buf[header_len];
+
+        // Unmask
+        for (uint64_t i = 0; i < payload_len; i++) {
+            payload[i] ^= mask[i % 4];
+        }
+
+        if (opcode == 0x1) { // text
+            printf("WS text: %.*s\n", (int)payload_len, payload);
+            int res = handle_ws_message(payload);
+        } else {
+            printf("Non-text frame opcode=%d len=%llu\n", opcode, payload_len);
+        }
 
         altcp_recved(pcb, p->tot_len);
-        //ws_send_text(pcb, "XD");
     }
-    pbuf_free(p);
 
+    pbuf_free(p);
     return ERR_OK;
 }
 
