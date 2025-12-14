@@ -25,7 +25,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "PushButton.hpp"
-
+#include "wsparsing.hpp"
 
 static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -96,6 +96,7 @@ int main()
 
     // printf("HTTP request:\n%s\n", request);
     /*
+    const char* server = HTTP_CLIENT_SERVER;
     char request[512];
     const char *json_body = "{ \"position_mm\": 1000 }";
 
@@ -110,7 +111,7 @@ int main()
     printf("HTTP GET request:\n%s\n", request);
 
 
-
+    
     // --- TLS config (no cert verification) ---
     const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
 
@@ -147,12 +148,12 @@ int main()
     altcp_tls_free_config(tls_config);
 
     return err == 0 ? 0 : 1;
-    }
-
     */
 
-
-
+    
+    //ACTUAL CODE BELOW
+    
+    
     // This should work
     const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
     const char tls_client_server[] = TLS_CLIENT_SERVER;
@@ -173,7 +174,6 @@ int main()
         "\r\n",
         tls_client_server, key, id);
     
-    printf("XD\n");
     printf(request);
 
     tls_config = altcp_tls_create_config_client(nullptr, sizeof(cert_ok));
@@ -186,7 +186,6 @@ int main()
         printf("Failed to initialize state\n");
         return 1;
     }
-    printf("XDDD\n");
     state->http_request = request;
     state->timeout = TLS_CLIENT_TIMEOUT_SECS;
     
@@ -194,7 +193,6 @@ int main()
         printf("Failed to open\n");
         return 1;
     }
-    printf("XDDD\n");
     // ------------------------------------------
     // INITIALIZATION ENDS HERE
     // ------------------------------------------
@@ -202,6 +200,7 @@ int main()
     Button button1(10, GPIO_IRQ_EDGE_RISE);
 
     while(!state->complete) {
+        poll_dispatcher(state);
         if (button1.hasEvent()) {
             printf("Button pressed");
             ws_send_text(state->pcb, "Button pressed");
@@ -218,5 +217,4 @@ int main()
     sleep_ms(100);
 
     return err == 0;
-
 }

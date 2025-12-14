@@ -1,5 +1,6 @@
 #pragma once
 
+
 #ifdef __cplusplus
 
 extern "C" {
@@ -7,6 +8,7 @@ extern "C" {
 
 // ---- C API exposed to .c files ----
 int handle_ws_message(const char* buff);
+void poll_dispatcher(void* state);
 
 #ifdef __cplusplus
 } // extern "C"
@@ -30,11 +32,12 @@ public:
     Dispatcher();
 
     int dispatch_ws_message(std::string_view message);
+    void poll(void* arg);
 
 
 private:
     commands::ApiCall api;
-    std::array<CommandMapping, 1> table;
+    std::array<CommandMapping, 2> table;
 
 };
 

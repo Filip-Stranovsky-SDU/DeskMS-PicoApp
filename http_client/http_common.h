@@ -1,6 +1,20 @@
 #pragma once
 
+
+
+#include "pico/cyw43_arch.h"
+
+#include "lwip/altcp_tcp.h"
+#include "lwip/altcp_tls.h"
+
+
+
+
 #define http_SERVER_PORT 8000
+
+#define HTTP_BODY_MAX 2048
+
+struct altcp_tls_config; 
 
 typedef struct http_CLIENT_T_ {
     struct altcp_pcb *pcb;
@@ -8,6 +22,13 @@ typedef struct http_CLIENT_T_ {
     int error;
     const char *http_request;
     int timeout;
+    struct altcp_tls_config* tls_config;
+
+    
+    char body[HTTP_BODY_MAX];
+    size_t body_len;
+    size_t expected_len;
+    bool headers_done;
 } http_CLIENT_T;
 
 #ifdef __cplusplus
@@ -15,6 +36,7 @@ extern "C" {
 #endif
 
 extern struct altcp_tls_config *http_config;
+extern http_CLIENT_T* stateC;
 
 #ifdef __cplusplus
 }

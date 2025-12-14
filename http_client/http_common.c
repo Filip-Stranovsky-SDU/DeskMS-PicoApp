@@ -16,6 +16,8 @@
 
 #include "http_common.h"
 
+#include "tls_common.h"
+
 struct altcp_tls_config *http_config = NULL;  // actual definition + initialization
 
 
@@ -117,35 +119,80 @@ void http_client_err(void *arg, err_t err) {
     state->error = PICO_ERROR_GENERIC;
 }
 
-err_t http_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err) {
-    http_CLIENT_T *state = (http_CLIENT_T*)arg;
+err_t http_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err)
+{
+    http_CLIENT_T *state = (http_CLIENT_T *)arg;
 
-    if (!p) {
-        printf("connection closed\n");
-        return http_client_close(state);
+    /* 1. Error = pcb is dead */
+    if (err != ERR_OK) {
+        state->pcb = NULL;
+        state->complete = true;
+        return err;
     }
 
-    if (p->tot_len > 0) {
-        char buf[p->tot_len + 1];
-        pbuf_copy_partial(p, buf, p->tot_len, 0);
-        buf[p->tot_len] = 0;
+    /* 2. FIN from peer (rare with HTTP/1.1) */
+    if (p == NULL) {
+        state->complete = true;
+        return ERR_OK;
+    }
 
-        // find body start
-        char *body = strstr(buf, "\r\n\r\n");
-        if (body) {
-            body += 4; // skip headers
-            printf("%s", body); // print whatever body is in this chunk
-        } else {
-            printf("%s", buf); // might be continuation of body
+    /* 3. Copy TCP payload */
+    size_t len = p->tot_len;
+    char tmp[512];                    // fixed buffer, not VLA
+    if (len > sizeof(tmp)) len = sizeof(tmp);
+
+    pbuf_copy_partial(p, tmp, len, 0);
+
+    size_t offset = 0;
+
+    /* 4. Header parsing */
+    if (!state->headers_done) {
+        char *hdr_end = NULL;
+        for (size_t i = 0; i + 3 < len; i++) {
+            if (tmp[i] == '\r' && tmp[i+1] == '\n' &&
+                tmp[i+2] == '\r' && tmp[i+3] == '\n') {
+                hdr_end = &tmp[i + 4];
+                offset = (hdr_end - tmp);
+                break;
+            }
         }
 
-        altcp_recved(pcb, p->tot_len);
-    }
-    if (!p) {
-        printf("connection closed\n");
-        return http_client_close(state);
+        if (hdr_end) {
+            /* parse Content-Length */
+            char *cl = strstr(tmp, "Content-Length:");
+            if (cl) {
+                state->expected_len = atoi(cl + 15);
+            }
+
+            state->headers_done = true;
+        } else {
+            /* headers not complete yet */
+            goto out;
+        }
     }
 
+    /* 5. Append body data */
+    if (state->headers_done && offset < len) {
+        size_t body_part = len - offset;
+
+        if (state->body_len + body_part <= sizeof(state->body)) {
+            memcpy(state->body + state->body_len,
+                   tmp + offset,
+                   body_part);
+            state->body_len += body_part;
+        }
+    }
+
+    /* 6. Done? */
+    if (state->expected_len &&
+        state->body_len >= state->expected_len) {
+
+        state->complete = true;
+        altcp_close(pcb);   // YOU close, not the server
+    }
+
+out:
+    altcp_recved(pcb, p->tot_len);
     pbuf_free(p);
     return ERR_OK;
 }

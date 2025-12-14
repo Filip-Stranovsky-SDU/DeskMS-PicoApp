@@ -23,7 +23,7 @@ struct altcp_tls_config *tls_config = NULL;  // actual definition + initializati
 void ws_send_text(struct altcp_pcb *pcb, const char *msg)
 {
     size_t len = strlen(msg);
-
+    
     // Limit for stack buffer (adjust as needed)
     if (len > 65535) {
         // too long for this simple implementation
@@ -44,12 +44,12 @@ void ws_send_text(struct altcp_pcb *pcb, const char *msg)
     // Mask bit = 1
     if (len <= 125) {
         frame[offset++] = 0x80 | (uint8_t)len;
-    } else if (len <= 65535) {
+    } else {
         frame[offset++] = 0x80 | 126;
         frame[offset++] = (len >> 8) & 0xFF;
         frame[offset++] = len & 0xFF;
     }
-
+    
     // Random mask key (example, can be random)
     uint8_t mask[4] = {1,2,3,4};
     memcpy(&frame[offset], mask, 4);

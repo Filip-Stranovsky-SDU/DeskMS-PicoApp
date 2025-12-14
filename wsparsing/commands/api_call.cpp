@@ -15,12 +15,17 @@
 extern "C" {
     #include "http_common.h"
     #include "http_verify.h"
+    #include "tls_common.h"
 }
 
 namespace sxd::commands {
 
+ApiCall::ApiCall() {
+    stateHTTP = nullptr;
+}
+
 int ApiCall::operator()(std::string_view arg) {
-    const char* server = "example.com";  // replace with your server
+    const char* server = HTTP_CLIENT_SERVER;  // replace with your server
     char request[512];
 
     // Build minimal HTTP request
@@ -28,7 +33,6 @@ int ApiCall::operator()(std::string_view arg) {
     bool is_post = arg.substr(0, 4) == "POST";
 
     if (is_post) {
-        const char* json_body = "{ \"position_mm\": 1000 }";
         snprintf(request, sizeof(request),
                  "%.*s\r\n"           // first line from arg
                  "Host: %s\r\n"
@@ -39,8 +43,8 @@ int ApiCall::operator()(std::string_view arg) {
                  "%s",
                  (int)arg.size(), arg.data(),
                  server,
-                 strlen(json_body),
-                 json_body);
+                 json_body.length(),
+                 json_body.c_str());
     } else { // GET
         snprintf(request, sizeof(request),
                  "%.*s\r\n"
@@ -61,39 +65,68 @@ int ApiCall::operator()(std::string_view arg) {
     }
 
     // --- HTTP client state ---
-    http_CLIENT_T* state = http_client_init();
-    if (!state) {
+    stateHTTP = http_client_init();
+    stateHTTP->expected_len = 0;
+    if (!stateHTTP) {
         printf("Failed to allocate HTTP client state\n");
         altcp_tls_free_config(tls_config);
         return 1;
     }
 
-    state->http_request = request;
-    state->timeout = HTTP_CLIENT_TIMEOUT_SECS;
-
-    if (!http_client_open(server, state)) {
+    stateHTTP->http_request = request;
+    stateHTTP->timeout = HTTP_CLIENT_TIMEOUT_SECS;
+    stateHTTP->tls_config = tls_config;
+    if (!http_client_open(server, stateHTTP)) {
         printf("Failed to open connection\n");
-        free(state);
+        free(stateHTTP);
         altcp_tls_free_config(tls_config);
         return 1;
     }
 
     printf("Connecting...\n");
 
-    // Poll until complete
-    while (!state->complete) {
-        sleep_ms(10);
+    // // Poll until complete
+    // while (!state->complete) {
+    //     sleep_ms(10);
+    // }
+
+    // ws_send_text(state->pcb, state->body);
+
+    // printf("Client finished.\n");
+
+    // int err = state->error;
+
+    // // Cleanup
+    // free(state);
+    // altcp_tls_free_config(tls_config);
+
+    return 0;
+}
+
+int ApiCall::store_json(std::string_view arg) {
+    printf("XD\n");
+    json_body = arg;
+}
+
+void ApiCall::poll(void* arg) {
+    TLS_CLIENT_T* state = (TLS_CLIENT_T*) arg;
+    if(!stateHTTP) return;
+    // Check if complete, finish if so
+    if (!stateHTTP->complete) {
+        return;
     }
+    printf("%s\n\n", stateHTTP->body);
+    ws_send_text(state->pcb, stateHTTP->body);
 
-    printf("Client finished.\n");
+    printf("Client finished. XD\n");
 
-    int err = state->error;
+    int err = stateHTTP->error;
 
     // Cleanup
-    free(state);
-    altcp_tls_free_config(tls_config);
-
-    return err;
+    free(stateHTTP);
+    altcp_tls_free_config(stateHTTP->tls_config);
+    stateHTTP = nullptr;
 }
+
 
 } // namespace sxd::commands

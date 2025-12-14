@@ -6,6 +6,8 @@ target_include_directories(wsparsing PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/../http_client
+    
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tls_client
 
     ${PICO_SDK_PATH}/src/rp2_common/pico_lwip/include
     ${PICO_SDK_PATH}/src/rp2_common/pico_lwip/lwip/src/include
