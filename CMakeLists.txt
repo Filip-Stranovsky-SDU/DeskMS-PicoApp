@@ -38,7 +38,7 @@ pico_sdk_init()
 
 file(GLOB BUTTONLED "${CMAKE_SOURCE_DIR}/ButtonLED/*.cpp")
 add_subdirectory(wsparsing)
-
+add_subdirectory(Display)
 
 
 add_executable(HelloWorld HelloWorld.cpp
@@ -84,6 +84,7 @@ target_link_libraries(HelloWorld
         pico_stdlib
         hardware_rtc
         wsparsing
+        Display
         
         )
 

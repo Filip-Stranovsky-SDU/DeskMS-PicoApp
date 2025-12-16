@@ -20,6 +20,34 @@
 
 struct altcp_tls_config *tls_config = NULL;  // actual definition + initialization
 
+void ws_send_pong(struct altcp_pcb *pcb, const uint8_t *payload, uint8_t len) {
+    if(len > 125) len = 125; // WebSocket control frames max 125 bytes
+    printf("ws_send_pong\n");
+    uint8_t frame[2 + 4 + 125]; // header + mask + payload max
+    uint8_t mask[4] = {0x12,0x34,0x56,0x78}; // random mask key
+
+    // FIN + PONG opcode
+    frame[0] = 0x8A;
+
+    // MASK bit set + payload length
+    frame[1] = 0x80 | len;
+
+    // Copy mask key
+    memcpy(&frame[2], mask, 4);
+
+    // Mask payload in-place
+    for(uint8_t i=0;i<len;i++) {
+        frame[6 + i] = payload[i] ^ mask[i % 4];
+    }
+
+    // Write header+mask+masked payload
+    altcp_write(pcb, frame, 6 + len, TCP_WRITE_FLAG_COPY);
+    altcp_output(pcb);
+}
+
+
+
+
 void ws_send_text(struct altcp_pcb *pcb, const char *msg)
 {
     size_t len = strlen(msg);
@@ -68,7 +96,7 @@ void ws_send_text(struct altcp_pcb *pcb, const char *msg)
 void ws_send_close(struct altcp_pcb *pcb)
 {
     uint8_t frame[8];
-
+    printf("ws_send_close\n");
     frame[0] = 0x88;          // FIN + CLOSE opcode
     frame[1] = 0x80 | 2;      // MASK + payload length = 2 bytes
 
@@ -126,7 +154,7 @@ err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
         printf("error writing data, err=%d", err);
         return tls_client_close(state);
     }
-    ws_send_text(pcb, "hello world");
+    // ws_send_text(pcb, "hello world");
 
 
     return ERR_OK;
@@ -150,6 +178,7 @@ err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t er
     TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
     if (!p) {
         printf("connection closed\n");
+        ws_send_close(pcb);
         return tls_client_close(state);
     }
 
@@ -163,7 +192,11 @@ err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t er
 
         char buf[p->tot_len + 1];
         pbuf_copy_partial(p, buf, p->tot_len, 0);
-        buf[p->tot_len+1] = 0;
+        if (p->tot_len < 2) {
+            pbuf_free(p);
+            return ERR_OK;
+        }
+        buf[p->tot_len] = 0;
 
         // Minimal WebSocket parse
         size_t header_len = 2;
@@ -195,6 +228,14 @@ err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t er
         if (opcode == 0x1) { // text
             printf("WS text: %.*s\n", (int)payload_len, payload);
             int res = handle_ws_message(payload);
+        } else if (opcode == 0x9) { // PING
+            printf("WS ping received, sending pong\n");
+            ws_send_pong(pcb, payload, payload_len);
+        // } else if (opcode == 0x8) { // CLOSE
+        //     printf("WS close received\n");
+        //     // ws_send_close(pcb);
+        //     pbuf_free(p);
+        //     return tls_client_close(state); 
         } else {
             printf("Non-text frame opcode=%d len=%llu\n", opcode, payload_len);
         }

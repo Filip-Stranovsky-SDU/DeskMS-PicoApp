@@ -26,6 +26,9 @@ extern "C" {
 
 #include "PushButton.hpp"
 #include "wsparsing.hpp"
+#include "ButtonHandler.hpp"
+#include "OLEDDisplay.hpp"
+#include "DisplayHandler.hpp"
 
 static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -58,15 +61,24 @@ int main()
 
    
 
-    if (cyw43_arch_init()) {
-        printf("failed to initialise\n");
-        return 1;
-    }
-    cyw43_arch_enable_sta_mode();
+    while (true) {
+        if (cyw43_arch_init()) {
+            printf("failed to initialise, retrying...\n");
+            sleep_ms(1000);
+            continue;
+        }
 
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
-        printf("failed to connect\n");
-        return 1;
+        cyw43_arch_enable_sta_mode();
+
+        if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD,
+            CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+            printf("failed to connect, retrying...\n");
+            sleep_ms(1000);
+            continue;
+        }
+
+        printf("Wi-Fi connected!\n");
+        break; // exit loop once connected
     }
     rtc_init();   // <-- required
 
@@ -79,80 +91,25 @@ int main()
     dt.min = 2;
     dt.sec = 0;
     rtc_set_datetime(&dt);
-    // sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    // sntp_setservername(0, "pool.ntp.org");
-    // sntp_init();
-    //if(true){
-
-    //const char *server = HTTP_CLIENT_SERVER;
-
-    // char request[256];
-    // snprintf(request, sizeof(request),
-    //          "GET / HTTP/1.1\r\n"
-    //          "Host: %s\r\n"
-    //          "Connection: close\r\n"
-    //          "\r\n",
-    //          server);
-
-    // printf("HTTP request:\n%s\n", request);
-    /*
-    const char* server = HTTP_CLIENT_SERVER;
-    char request[512];
-    const char *json_body = "{ \"position_mm\": 1000 }";
-
-    snprintf(request, sizeof(request),
-            "GET /api/v2/E9Y2LxT4g1hQZ7aD8nR3mWx5P0qK6pV7/desks HTTP/1.1\r\n"
-            "Host: %s\r\n"
-            "Content-Type: application/json\r\n"
-            "Connection: close\r\n"
-            "\r\n",
-            server);
-
-    printf("HTTP GET request:\n%s\n", request);
 
 
     
-    // --- TLS config (no cert verification) ---
-    const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
+    i2c_init(i2c_default, 400 * 1000);
+    gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
 
-    tls_config = altcp_tls_create_config_client(NULL, sizeof(cert_ok));
-    assert(tls_config);
+    // Create display object
+    OLEDDisplay display(i2c_default, 0x3C, 128, 32);
+    display.init();
+    const char* const entries[] = {"XDDDDD1\0", "XDDD2\0", "XDDDDDDDD3\0", "xddddd4\0"};
+    size_t entryCount = 4;
+    sxd::DisplayHandler dh(display, entries, entryCount);
+    dh.clear();
 
-    http_CLIENT_T *state = http_client_init();
-    if (!state) {
-        printf("Failed to allocate state\n");
-        return 1;
-    }
-
-    state->http_request = request;
-    state->timeout = TLS_CLIENT_TIMEOUT_SECS;
-
-    // --- Start connection ---
-    if (!http_client_open(server, state)) {
-        printf("Failed to open connection\n");
-        return 1;
-    }
-
-    printf("Connecting...\n");
-
-    // --- Main loop (Wi-Fi already assumed active) ---
-    while (!state->complete) {
-        sleep_ms(10);
-    }
-
-    printf("Client finished.\n");
-
-    int err = state->error;
-
-    free(state);
-    altcp_tls_free_config(tls_config);
-
-    return err == 0 ? 0 : 1;
-    */
-
-    
-    //ACTUAL CODE BELOW
-    
+    sxd::Dispatcher dispatcher(dh);
+    sxd::defaultDispatcher = &dispatcher;
     
     // This should work
     const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
@@ -174,7 +131,7 @@ int main()
         "\r\n",
         tls_client_server, key, id);
     
-    printf(request);
+    // printf(request);
 
     tls_config = altcp_tls_create_config_client(nullptr, sizeof(cert_ok));
     assert(tls_config);
@@ -193,21 +150,26 @@ int main()
         printf("Failed to open\n");
         return 1;
     }
+
+    Button button1(10, GPIO_IRQ_EDGE_RISE);
+    sxd::ButtonHandler bh(button1, dh, state);
+    dh.setAlertCallBack([&bh]() { bh.setAlert(); });
+    
     // ------------------------------------------
     // INITIALIZATION ENDS HERE
     // ------------------------------------------
 
-    Button button1(10, GPIO_IRQ_EDGE_RISE);
-
     while(!state->complete) {
         poll_dispatcher(state);
-        if (button1.hasEvent()) {
-            printf("Button pressed");
-            ws_send_text(state->pcb, "Button pressed");
-        }
 
-        sleep_ms(10);
+        bh.update();
+        // dh.render();
+
+        sleep_ms(50);
     }
+    
+
+
 
     sleep_ms(2000);
     int err = state->error;
@@ -215,6 +177,37 @@ int main()
     altcp_tls_free_config(tls_config);
     printf("Done\n");
     sleep_ms(100);
+    
 
     return err == 0;
+    
+}
+
+int main1() {
+    stdio_init_all();
+
+    i2c_init(i2c_default, 400 * 1000);
+    gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
+    gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+
+    // Create display object
+    OLEDDisplay display(i2c_default, 0x3C, 128, 32);
+    display.init();
+    const char* const entries[] = {"XDDDDD1\0", "XDDD2\0", "XDDDDDDDD3\0", "xddddd4\0"};
+    size_t entryCount = 4;
+    sxd::DisplayHandler dh(display, entries, entryCount);
+
+    
+    Button button1(10, GPIO_IRQ_EDGE_RISE);
+    sxd::ButtonHandler bh(button1, dh, nullptr); // won't work
+
+    while(true) {
+        bh.update();
+        // dh.render();
+
+        sleep_ms(50);
+    }
+
 }

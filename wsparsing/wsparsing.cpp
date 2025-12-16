@@ -1,7 +1,7 @@
 #include "wsparsing.hpp"
-
-#include "tls_common.h"
-
+extern "C" {
+    #include "tls_common.h"
+}
 #ifdef __cplusplus
 #include <cstdio>
 #include <string_view>
@@ -9,19 +9,21 @@
 
 
 namespace sxd {
-    sxd::Dispatcher dispatcher; // singleton instance
+    // NEEDS TO BE INITIALIZED BEFORE WEBSOCKET
+    Dispatcher* defaultDispatcher = nullptr; // actual definition
 
 // Dispatcher constructor initializes table with lambdas capturing `this`
-Dispatcher::Dispatcher() {
+Dispatcher::Dispatcher(DisplayHandler& display) : dc(display) {
     table = {{
         { "req:", [this](std::string_view arg){ return api(arg); } },
-        { "json:", [this](std::string_view arg){ return api.store_json(arg); } }
+        { "json:", [this](std::string_view arg){ return api.store_json(arg); } },
+        { "names:", [this](std::string_view arg){ return dc(arg); }},
+        { "alert:", [this](std::string_view arg){ return dc.alert(arg); }}
     }};
 }
 
 // Dispatch message: find first matching command prefix and call it
 int Dispatcher::dispatch_ws_message(std::string_view message) {
-    printf("%s XD\n", message);
     for (auto& entry : table) {
         if (message.substr(0, entry.name.size()) == entry.name) {
             
@@ -49,8 +51,13 @@ int handle_ws_message(const char* buff) {
     if (!buff) return -1;
 
 #ifdef __cplusplus
+    if(!sxd::defaultDispatcher) {
+        printf("Default Dispatcher uninitialized!!!!!!!!!!!!\n");
+        return -1;
+    }
     std::string_view view(buff);
-    return sxd::dispatcher.dispatch_ws_message(view);
+    printf("%s XD\n", view.data());
+    return sxd::defaultDispatcher->dispatch_ws_message(view);
 #else
     (void)buff; // unused in pure C
     return -1;
@@ -58,7 +65,11 @@ int handle_ws_message(const char* buff) {
 }
 
 void poll_dispatcher(void* arg) {
-    sxd::dispatcher.poll(arg);
+    if(!sxd::defaultDispatcher) {
+        printf("Default Dispatcher uninitialized!!!!!!!!!!!!\n");
+        return;
+    }
+    sxd::defaultDispatcher->poll(arg);
 }
 
 

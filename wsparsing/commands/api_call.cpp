@@ -30,11 +30,11 @@ int ApiCall::operator()(std::string_view arg) {
 
     // Build minimal HTTP request
     // If POST, you could append a JSON body, for GET we skip the body
-    bool is_post = arg.substr(0, 4) == "POST";
+    bool is_put = arg.substr(0, 3) == "PUT";
 
-    if (is_post) {
+    if (is_put) {
         snprintf(request, sizeof(request),
-                 "%.*s\r\n"           // first line from arg
+                 "%.*s HTTP/1.1\r\n"           // first line from arg
                  "Host: %s\r\n"
                  "Content-Type: application/json\r\n"
                  "Connection: close\r\n"
@@ -43,11 +43,11 @@ int ApiCall::operator()(std::string_view arg) {
                  "%s",
                  (int)arg.size(), arg.data(),
                  server,
-                 json_body.length(),
-                 json_body.c_str());
+                 json_len,
+                 json_body.data());
     } else { // GET
         snprintf(request, sizeof(request),
-                 "%.*s\r\n"
+                 "%.*s HTTP/1.1\r\n"
                  "Host: %s\r\n"
                  "Connection: close\r\n"
                  "\r\n",
@@ -104,8 +104,10 @@ int ApiCall::operator()(std::string_view arg) {
 }
 
 int ApiCall::store_json(std::string_view arg) {
-    printf("XD\n");
-    json_body = arg;
+    std::memcpy(json_body.data(), arg.data(), arg.length());
+    json_len = arg.length();
+    printf("Json stored\n");
+    return 0;
 }
 
 void ApiCall::poll(void* arg) {
@@ -118,7 +120,7 @@ void ApiCall::poll(void* arg) {
     printf("%s\n\n", stateHTTP->body);
     ws_send_text(state->pcb, stateHTTP->body);
 
-    printf("Client finished. XD\n");
+    printf("HTTP finished\n");
 
     int err = stateHTTP->error;
 

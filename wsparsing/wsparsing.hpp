@@ -24,12 +24,14 @@ void poll_dispatcher(void* state);
 
 #include "command_mapping.hpp"
 #include "api_call.hpp"
+#include "display_call.hpp"
 
 namespace sxd{
 
 class Dispatcher {
 public:
-    Dispatcher();
+    
+    Dispatcher(DisplayHandler& display);
 
     int dispatch_ws_message(std::string_view message);
     void poll(void* arg);
@@ -37,9 +39,13 @@ public:
 
 private:
     commands::ApiCall api;
-    std::array<CommandMapping, 2> table;
+    commands::DisplayCall dc;
+    std::array<CommandMapping, 4> table;
 
 };
+
+extern Dispatcher* defaultDispatcher;
+
 
 
 }

@@ -9,7 +9,7 @@
 #include "pico/cyw43_arch.h"
 
 // Using this url as we know the root cert won't change for a long time
-#define TLS_CLIENT_SERVER "34.118.87.247"
+#define TLS_CLIENT_SERVER "34.118.41.14"
 
 //#define TLS_CLIENT_SERVER "fw-download-alias1.raspberrypi.com"
 #define TLS_CLIENT_HTTP_REQUEST  "GET / HTTP/1.1\r\n" \
