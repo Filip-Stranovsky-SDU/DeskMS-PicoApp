@@ -89,6 +89,7 @@ void ButtonHandler::removeUser() {
     state = UIState::NO_USER;
     dh.clear();
     printf("removeUser");
+    ws_send_text(tls_state->pcb, "removeUser");
     // TODO: Remove user
 }
 
@@ -118,6 +119,7 @@ void ButtonHandler::dismissMenu() {
     state = UIState::NO_USER;
     dh.clear();
     printf("dismissMenu");
+    ws_send_text(tls_state->pcb, "menuDismiss");
     // TODO: Dismiss user menu
 }
 
