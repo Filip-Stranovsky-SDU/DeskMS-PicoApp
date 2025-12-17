@@ -44,6 +44,7 @@ add_subdirectory(Display)
 add_executable(HelloWorld HelloWorld.cpp
                 tls_client/tls_common.c
                 http_client/http_common.c
+                tls_client/tls_payloads.c
                 ${BUTTONLED}
 )
 message(STATUS "Executable was added")

@@ -18,32 +18,20 @@
 
 #include "wsparsing.hpp"
 
+#include "tls_payloads.h"
+
 struct altcp_tls_config *tls_config = NULL;  // actual definition + initialization
 
-void ws_send_pong(struct altcp_pcb *pcb, const uint8_t *payload, uint8_t len) {
-    if(len > 125) len = 125; // WebSocket control frames max 125 bytes
-    printf("ws_send_pong\n");
-    uint8_t frame[2 + 4 + 125]; // header + mask + payload max
-    uint8_t mask[4] = {0x12,0x34,0x56,0x78}; // random mask key
-
-    // FIN + PONG opcode
-    frame[0] = 0x8A;
-
-    // MASK bit set + payload length
-    frame[1] = 0x80 | len;
-
-    // Copy mask key
-    memcpy(&frame[2], mask, 4);
-
-    // Mask payload in-place
-    for(uint8_t i=0;i<len;i++) {
-        frame[6 + i] = payload[i] ^ mask[i % 4];
-    }
-
-    // Write header+mask+masked payload
-    altcp_write(pcb, frame, 6 + len, TCP_WRITE_FLAG_COPY);
+void ws_send_pong(struct altcp_pcb *pcb,
+                  const uint8_t *payload,
+                  uint8_t len)
+{
+    uint8_t frame[2 + 4 + 125];
+    size_t n = ws_build_pong_frame(frame, payload, len);
+    altcp_write(pcb, frame, n, TCP_WRITE_FLAG_COPY);
     altcp_output(pcb);
 }
+
 
 
 
