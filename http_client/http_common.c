@@ -188,7 +188,7 @@ err_t http_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t e
         state->body_len >= state->expected_len) {
 
         state->complete = true;
-        altcp_close(pcb);   // YOU close, not the server
+        //altcp_close(pcb);   // YOU close, not the server
     }
 
 out:
