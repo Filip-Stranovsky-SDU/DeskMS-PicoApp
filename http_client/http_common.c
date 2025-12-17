@@ -107,7 +107,7 @@ err_t http_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
 
 err_t http_client_poll(void *arg, struct altcp_pcb *pcb) {
     http_CLIENT_T *state = (http_CLIENT_T*)arg;
-    printf("timed out\n");
+    printf("timed out HTTP\n");
     state->error = PICO_ERROR_TIMEOUT;
     return http_client_close(arg);
 }

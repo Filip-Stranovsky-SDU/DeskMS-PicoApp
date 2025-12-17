@@ -162,7 +162,7 @@ err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
 
 err_t tls_client_poll(void *arg, struct altcp_pcb *pcb) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
-    printf("timed out\n");
+    printf("timed out WS\n");
     state->error = PICO_ERROR_TIMEOUT;
     return tls_client_close(arg);
 }
@@ -178,7 +178,7 @@ err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t er
     TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
     if (!p) {
         printf("connection closed\n");
-        ws_send_close(pcb);
+        // ws_send_close(pcb);
         return tls_client_close(state);
     }
 
@@ -281,7 +281,8 @@ bool tls_client_open(const char *hostname, void *arg) {
     ip_addr_t server_ip;
     TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
 
-    state->pcb = altcp_tls_new(tls_config, IPADDR_TYPE_ANY);
+    // state->pcb = altcp_tls_new(tls_config, IPADDR_TYPE_ANY); // TLS VERSION
+    state->pcb = altcp_new(NULL);
     if (!state->pcb) {
         printf("failed to create pcb\n");
         return false;
@@ -294,7 +295,7 @@ bool tls_client_open(const char *hostname, void *arg) {
     altcp_err(state->pcb, tls_client_err);
 
     /* Set SNI */
-    mbedtls_ssl_set_hostname(altcp_tls_context(state->pcb), hostname);
+    // mbedtls_ssl_set_hostname(altcp_tls_context(state->pcb), hostname); // FOR TLS
 
     printf("resolving %s\n", hostname);
 

@@ -84,6 +84,7 @@ int ApiCall::operator()(std::string_view arg) {
     }
 
     printf("Connecting...\n");
+    requestStartTime = get_absolute_time();
 
     // // Poll until complete
     // while (!state->complete) {
@@ -114,6 +115,17 @@ void ApiCall::poll(void* arg) {
     TLS_CLIENT_T* state = (TLS_CLIENT_T*) arg;
     if(!stateHTTP) return;
     // Check if complete, finish if so
+    uint64_t response_time = absolute_time_diff_us(requestStartTime, get_absolute_time()) / 1000;
+    if (response_time > MAX_RESPONSE_TIME_MS) {
+        printf("HTTP request took too long\n");
+        ws_send_text(state->pcb, "res:failed");
+        http_client_close(stateHTTP);
+
+        // Cleanup
+        free(stateHTTP);
+        altcp_tls_free_config(stateHTTP->tls_config);
+        stateHTTP = nullptr;
+    }
     if (!stateHTTP->complete) {
         return;
     }
@@ -123,10 +135,11 @@ void ApiCall::poll(void* arg) {
     printf("HTTP finished\n");
 
     int err = stateHTTP->error;
+    http_client_close(stateHTTP);
 
     // Cleanup
-    free(stateHTTP);
     altcp_tls_free_config(stateHTTP->tls_config);
+    free(stateHTTP);
     stateHTTP = nullptr;
 }
 
