@@ -26,21 +26,23 @@ void poll_dispatcher(void* state);
 #include "api_call.hpp"
 #include "display_call.hpp"
 
+
 namespace sxd{
 
 class Dispatcher {
 public:
-    
+    static constexpr size_t DISPATCH_TABLE_SIZE = 4;
     Dispatcher(DisplayHandler& display);
 
     int dispatch_ws_message(std::string_view message);
     void poll(void* arg);
+    void set_dispatch_table(const std::array<CommandMapping, DISPATCH_TABLE_SIZE> &dt);
 
 
 private:
     commands::ApiCall api;
     commands::DisplayCall dc;
-    std::array<CommandMapping, 4> table;
+    std::array<CommandMapping, DISPATCH_TABLE_SIZE> table;
 
 };
 

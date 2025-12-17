@@ -99,3 +99,5 @@ set_source_files_properties(
 
 pico_add_extra_outputs(HelloWorld)
 
+# add_subdirectory(tests)
+

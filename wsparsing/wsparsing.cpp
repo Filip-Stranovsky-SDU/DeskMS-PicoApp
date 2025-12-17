@@ -1,7 +1,5 @@
 #include "wsparsing.hpp"
-extern "C" {
-    #include "tls_common.h"
-}
+
 #ifdef __cplusplus
 #include <cstdio>
 #include <string_view>
@@ -36,6 +34,9 @@ int Dispatcher::dispatch_ws_message(std::string_view message) {
 
 void Dispatcher::poll(void* state) {
     api.poll(state);
+}
+void Dispatcher::set_dispatch_table(const std::array<CommandMapping, DISPATCH_TABLE_SIZE> &dt) {
+    table = dt;
 }
 
 } // namespace sxd
