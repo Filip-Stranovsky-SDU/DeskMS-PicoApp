@@ -74,6 +74,7 @@ int main()
             CYW43_AUTH_WPA2_AES_PSK, 30000)) {
             printf("failed to connect, retrying...\n");
             sleep_ms(1000);
+            cyw43_arch_deinit();
             continue;
         }
 
@@ -114,7 +115,7 @@ int main()
     // This should work
     const uint8_t cert_ok[] = TLS_ROOT_CERT_OK;
     const char tls_client_server[] = TLS_CLIENT_SERVER;
-    const char id[] = "cd:fb:1a:53:fb:e6";
+    const char id[] = "1";
     char key[26];
     generate_ws_key(key);
     char request[512];
@@ -178,7 +179,7 @@ int main()
     printf("Done\n");
     sleep_ms(100);
     
-
+    assert(false);
     return err == 0;
     
 }

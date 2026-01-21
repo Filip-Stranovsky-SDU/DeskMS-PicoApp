@@ -91,7 +91,7 @@ void ButtonHandler::removeUser() {
     printf("removeUser");
     ws_send_text(tls_state->pcb, "removeUser");
     // TODO: Remove user
-}
+} 
 
 void ButtonHandler::confirm() {
     state = UIState::USER;

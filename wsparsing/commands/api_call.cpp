@@ -30,7 +30,7 @@ int ApiCall::operator()(std::string_view arg) {
 
     // Build minimal HTTP request
     // If POST, you could append a JSON body, for GET we skip the body
-    bool is_put = arg.substr(0, 3) == "PUT";
+    bool is_put = arg.find("PUT", 0) != std::string_view::npos;  // checks if arg starts with "PUT"
 
     if (is_put) {
         snprintf(request, sizeof(request),
@@ -45,6 +45,7 @@ int ApiCall::operator()(std::string_view arg) {
                  server,
                  json_len,
                  json_body.data());
+
     } else { // GET
         snprintf(request, sizeof(request),
                  "%.*s HTTP/1.1\r\n"
@@ -122,8 +123,9 @@ void ApiCall::poll(void* arg) {
         http_client_close(stateHTTP);
 
         // Cleanup
-        free(stateHTTP);
+        
         altcp_tls_free_config(stateHTTP->tls_config);
+        free(stateHTTP);
         stateHTTP = nullptr;
     }
     if (!stateHTTP->complete) {
